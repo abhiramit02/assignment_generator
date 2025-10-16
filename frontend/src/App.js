@@ -18,48 +18,59 @@ function App() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!file) {
+    setError('Please select a PDF file first');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('pdfFile', file);
+
+  setIsLoading(true);
+  setError('');
+  setMcqs([]);
+
+  try {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    console.log('Making request to:', `${API_URL}/api/generate-mcqs`);
     
-    if (!file) {
-      setError('Please select a PDF file first');
-      return;
+    const response = await fetch(`${API_URL}/api/generate-mcqs`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Accept': 'application/json'
+      },
+    });
+
+    console.log('Response status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('Raw response:', responseText); // Log the raw response
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const formData = new FormData();
-    formData.append('pdfFile', file);
-
-    setIsLoading(true);
-    setError('');
-    setMcqs([]); // Clear previous results
-
     try {
-      const response = await fetch('/api/generate-mcqs', {
-        method: 'POST',
-        body: formData,
-        // Don't set Content-Type header, let the browser set it with the correct boundary
-        headers: {},
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       if (data.mcqs && data.mcqs.length > 0) {
         setMcqs(data.mcqs);
       } else {
         throw new Error('No MCQs were generated. Please try again.');
       }
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err.message || 'An error occurred while generating MCQs. Please try again.');
-    } finally {
-      setIsLoading(false);
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      throw new Error('Invalid response from server');
     }
-  };
-
+  } catch (err) {
+    console.error('Error:', err);
+    setError(err.message || 'Failed to generate MCQs. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="app">
       <header className="header">
